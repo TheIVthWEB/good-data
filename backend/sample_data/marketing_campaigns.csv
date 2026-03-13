@@ -1,0 +1,31 @@
+date,campaign,channel,source,medium,impressions,clicks,conversions,spend,revenue
+2024-01-01,Winter Sale,Google Ads,google,cpc,45000,1200,45,850.00,2250.00
+2024-01-01,Winter Sale,Facebook,facebook,paid_social,62000,980,32,620.00,1600.00
+2024-01-01,Brand Awareness,Instagram,instagram,paid_social,38000,450,12,380.00,600.00
+2024-01-02,Winter Sale,Google Ads,google,cpc,48000,1350,52,920.00,2600.00
+2024-01-02,Winter Sale,Facebook,facebook,paid_social,58000,920,28,580.00,1400.00
+2024-01-02,Brand Awareness,Instagram,instagram,paid_social,41000,520,15,420.00,750.00
+2024-01-03,Winter Sale,Google Ads,google,cpc,52000,1480,58,1050.00,2900.00
+2024-01-03,Winter Sale,Facebook,facebook,paid_social,65000,1050,38,680.00,1900.00
+2024-01-03,Brand Awareness,Instagram,instagram,paid_social,35000,380,10,350.00,500.00
+2024-01-04,Winter Sale,Google Ads,google,cpc,49000,1280,48,890.00,2400.00
+2024-01-04,Winter Sale,Facebook,facebook,paid_social,61000,950,30,600.00,1500.00
+2024-01-04,Brand Awareness,TikTok,tiktok,paid_social,72000,890,22,450.00,1100.00
+2024-01-05,Winter Sale,Google Ads,google,cpc,55000,1520,62,1120.00,3100.00
+2024-01-05,Winter Sale,Facebook,facebook,paid_social,68000,1120,42,720.00,2100.00
+2024-01-05,Brand Awareness,TikTok,tiktok,paid_social,85000,1050,28,520.00,1400.00
+2024-01-06,Spring Preview,Google Ads,google,cpc,42000,980,35,720.00,1750.00
+2024-01-06,Spring Preview,Facebook,facebook,paid_social,55000,820,25,550.00,1250.00
+2024-01-06,Brand Awareness,TikTok,tiktok,paid_social,78000,920,24,480.00,1200.00
+2024-01-07,Spring Preview,Google Ads,google,cpc,46000,1100,42,820.00,2100.00
+2024-01-07,Spring Preview,Facebook,facebook,paid_social,59000,880,28,590.00,1400.00
+2024-01-07,Retargeting,Google Ads,google,remarketing,25000,680,35,420.00,1750.00
+2024-01-08,Spring Preview,Google Ads,google,cpc,51000,1250,48,950.00,2400.00
+2024-01-08,Spring Preview,Facebook,facebook,paid_social,63000,980,32,650.00,1600.00
+2024-01-08,Retargeting,Google Ads,google,remarketing,28000,750,42,480.00,2100.00
+2024-01-09,Spring Preview,Google Ads,google,cpc,48000,1180,45,880.00,2250.00
+2024-01-09,Spring Preview,Facebook,facebook,paid_social,60000,920,30,620.00,1500.00
+2024-01-09,Retargeting,Facebook,facebook,remarketing,32000,820,48,520.00,2400.00
+2024-01-10,Spring Preview,Google Ads,google,cpc,53000,1350,52,1020.00,2600.00
+2024-01-10,Email Campaign,Email,mailchimp,email,0,2500,85,150.00,4250.00
+2024-01-10,Retargeting,Facebook,facebook,remarketing,35000,920,55,580.00,2750.00

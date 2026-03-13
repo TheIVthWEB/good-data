@@ -23,7 +23,10 @@ build/
 backend/data/
 *.db
 *.sqlite
-*.csv
+
+# Ignore uploaded CSVs but keep sample data
+backend/data/uploads/*.csv
+!backend/sample_data/*.csv
 
 # IDE
 .vscode/

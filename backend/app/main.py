@@ -4,10 +4,11 @@ from typing import Optional
 import os
 
 from app.config import settings
-from app.database import init_db, get_data_sources, get_data_source, delete_data_source
+from app.database import init_db, get_data_sources, get_data_source, delete_data_source, query_data as db_query
 from app.connectors import CSVConnector, GoogleSheetsConnector
-from app.services import QueryService
+from app.services import QueryService, ConversionAnalytics, IncrementalityAnalyzer
 from app.models import QueryRequest, DataSourceType
+import pandas as pd
 
 # Initialize app
 app = FastAPI(
@@ -27,6 +28,8 @@ app.add_middleware(
 
 # Initialize services
 query_service = QueryService()
+conversion_analytics = ConversionAnalytics()
+incrementality_analyzer = IncrementalityAnalyzer()
 
 
 @app.on_event("startup")
@@ -201,6 +204,169 @@ async def get_combined_schema():
         combined["total_rows"] += source.get("row_count", 0)
 
     return combined
+
+
+# ============ Conversion Analytics ============
+
+@app.get("/api/analytics/funnel")
+async def analyze_funnel():
+    """Analyze the full conversion funnel across all data."""
+    sources = get_data_sources()
+    if not sources:
+        raise HTTPException(status_code=400, detail="No data sources available")
+
+    try:
+        # Get all data
+        table_names = [s["config"]["table_name"] for s in sources]
+        dfs = [db_query(f"SELECT * FROM {t}") for t in table_names]
+        df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+        if df.empty:
+            raise HTTPException(status_code=400, detail="No data available")
+
+        result = conversion_analytics.analyze_conversion_funnel(df)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analytics/conversion-by-segment/{segment}")
+async def conversion_by_segment(segment: str):
+    """Analyze conversion rates by segment with statistical comparison."""
+    sources = get_data_sources()
+    if not sources:
+        raise HTTPException(status_code=400, detail="No data sources available")
+
+    try:
+        table_names = [s["config"]["table_name"] for s in sources]
+        dfs = [db_query(f"SELECT * FROM {t}") for t in table_names]
+        df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+        if df.empty:
+            raise HTTPException(status_code=400, detail="No data available")
+
+        result = conversion_analytics.conversion_rate_by_segment(df, segment)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analytics/conversion-trends")
+async def conversion_trends():
+    """Analyze conversion rate trends over time."""
+    sources = get_data_sources()
+    if not sources:
+        raise HTTPException(status_code=400, detail="No data sources available")
+
+    try:
+        table_names = [s["config"]["table_name"] for s in sources]
+        dfs = [db_query(f"SELECT * FROM {t}") for t in table_names]
+        df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+        if df.empty:
+            raise HTTPException(status_code=400, detail="No data available")
+
+        result = conversion_analytics.conversion_trend_analysis(df)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/analytics/ab-test")
+async def analyze_ab_test(
+    variant_a_name: str = Form(...),
+    variant_a_visitors: int = Form(...),
+    variant_a_conversions: int = Form(...),
+    variant_b_name: str = Form(...),
+    variant_b_visitors: int = Form(...),
+    variant_b_conversions: int = Form(...)
+):
+    """Analyze A/B test results for statistical significance."""
+    variant_a = {
+        "name": variant_a_name,
+        "visitors": variant_a_visitors,
+        "conversions": variant_a_conversions
+    }
+    variant_b = {
+        "name": variant_b_name,
+        "visitors": variant_b_visitors,
+        "conversions": variant_b_conversions
+    }
+
+    result = conversion_analytics.ab_test_analysis(variant_a, variant_b)
+    return result
+
+
+@app.get("/api/analytics/sample-size")
+async def calculate_sample_size(
+    baseline_rate: float,
+    minimum_effect: float = 0.1,
+    confidence: float = 0.95,
+    power: float = 0.8
+):
+    """Calculate required sample size for A/B test."""
+    result = conversion_analytics.sample_size_calculator(
+        baseline_rate, minimum_effect, confidence, power
+    )
+    return result
+
+
+# ============ Incrementality Analytics ============
+
+@app.get("/api/analytics/incrementality")
+async def estimate_incrementality():
+    """Estimate channel incrementality using statistical methods."""
+    sources = get_data_sources()
+    if not sources:
+        raise HTTPException(status_code=400, detail="No data sources available")
+
+    try:
+        table_names = [s["config"]["table_name"] for s in sources]
+        dfs = [db_query(f"SELECT * FROM {t}") for t in table_names]
+        df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+        if df.empty:
+            raise HTTPException(status_code=400, detail="No data available")
+
+        result = incrementality_analyzer.estimate_channel_incrementality(df)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analytics/incrementality/time-based")
+async def time_based_incrementality(treatment_start: Optional[str] = None):
+    """Estimate incrementality using before/after analysis."""
+    sources = get_data_sources()
+    if not sources:
+        raise HTTPException(status_code=400, detail="No data sources available")
+
+    try:
+        table_names = [s["config"]["table_name"] for s in sources]
+        dfs = [db_query(f"SELECT * FROM {t}") for t in table_names]
+        df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+        if df.empty:
+            raise HTTPException(status_code=400, detail="No data available")
+
+        result = incrementality_analyzer.time_based_incrementality(df, treatment_start=treatment_start)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analytics/incrementality/holdout-design")
+async def design_holdout_test(
+    daily_conversions: float,
+    minimum_lift: float = 0.1,
+    confidence: float = 0.95,
+    power: float = 0.8
+):
+    """Design a holdout test to measure true incrementality."""
+    result = incrementality_analyzer.design_holdout_test(
+        daily_conversions, minimum_lift, confidence, power
+    )
+    return result
 
 
 if __name__ == "__main__":

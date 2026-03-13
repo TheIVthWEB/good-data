@@ -6,6 +6,8 @@ from app.database import query_data, get_data_sources, get_data_source, save_que
 from app.services.claude_service import ClaudeService
 from app.services.marketing_intelligence import MarketingIntelligence
 from app.services.advanced_analytics import AdvancedAnalytics
+from app.services.conversion_analytics import ConversionAnalytics
+from app.services.incrementality import IncrementalityAnalyzer
 
 
 class QueryService:
@@ -15,6 +17,8 @@ class QueryService:
         self.claude = ClaudeService()
         self.marketing_intel = MarketingIntelligence()
         self.analytics = AdvancedAnalytics()
+        self.conversion = ConversionAnalytics()
+        self.incrementality = IncrementalityAnalyzer()
 
     def process_query(self, question: str, data_source_ids: Optional[list[str]] = None,
                      deep_analysis: bool = True) -> dict:
@@ -143,6 +147,7 @@ class QueryService:
     def _run_advanced_analytics(self, df: pd.DataFrame, question: str) -> dict:
         """Run advanced analytics on the data."""
         analytics_results = {}
+        question_lower = question.lower()
 
         try:
             # Time series analysis
@@ -170,6 +175,33 @@ class QueryService:
                 if dim in df.columns:
                     analytics_results[f"segmentation_by_{dim}"] = self.analytics.segmentation_analysis(df, dim)
                     break
+
+            # Conversion funnel analysis
+            if 'clicks' in df.columns and 'conversions' in df.columns:
+                analytics_results["conversion_funnel"] = self.conversion.analyze_conversion_funnel(df)
+
+                # Conversion rate by segment (if relevant dimensions exist)
+                for dim in ['channel', 'campaign', 'source']:
+                    if dim in df.columns:
+                        analytics_results[f"conversion_by_{dim}"] = self.conversion.conversion_rate_by_segment(df, dim)
+                        break
+
+                # Conversion trends if date available
+                if 'date' in df.columns:
+                    analytics_results["conversion_trends"] = self.conversion.conversion_trend_analysis(df)
+
+            # Incrementality analysis (if question relates to it or we have spend/conversion data)
+            incrementality_keywords = ['incremental', 'incrementality', 'true impact', 'causal', 'lift', 'holdout']
+            has_required_data = 'spend' in df.columns and 'conversions' in df.columns
+            question_asks_incrementality = any(kw in question_lower for kw in incrementality_keywords)
+
+            if has_required_data and ('channel' in df.columns or 'source' in df.columns):
+                # Always run basic incrementality estimation
+                analytics_results["incrementality"] = self.incrementality.estimate_channel_incrementality(df)
+
+                # Time-based incrementality if we have dates
+                if 'date' in df.columns:
+                    analytics_results["time_based_incrementality"] = self.incrementality.time_based_incrementality(df)
 
         except Exception as e:
             analytics_results["error"] = str(e)

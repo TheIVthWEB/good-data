@@ -16,6 +16,9 @@ google-auth-oauthlib==1.2.0
 # Claude API
 anthropic==0.18.1
 
+# Statistics
+scipy==1.12.0
+
 # Utilities
 python-dotenv==1.0.1
 pydantic==2.6.1

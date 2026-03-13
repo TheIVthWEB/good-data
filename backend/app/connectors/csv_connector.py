@@ -5,6 +5,7 @@ import uuid
 
 from app.config import settings
 from app.database import create_data_table, save_data_source
+from app.services.data_cleaner import DataCleaner
 
 
 class CSVConnector:
@@ -27,13 +28,19 @@ class CSVConnector:
         upload_path.parent.mkdir(parents=True, exist_ok=True)
         upload_path.write_bytes(file_content)
 
-        # Load and analyze the data
+        # Load the raw data
         df = pd.read_csv(upload_path)
+        original_shape = df.shape
 
-        # Extract schema info
+        # Clean and normalize the data
+        cleaner = DataCleaner()
+        df, cleaning_report = cleaner.clean_dataframe(df)
+
+        # Extract schema info from cleaned data
         schema_info = CSVConnector._extract_schema(df)
+        schema_info["cleaning_report"] = cleaning_report
 
-        # Create queryable table in SQLite
+        # Create queryable table in SQLite with cleaned data
         create_data_table(table_name, df)
 
         # Save data source metadata
@@ -47,7 +54,10 @@ class CSVConnector:
                 "original_filename": filename
             },
             "schema_info": schema_info,
-            "row_count": len(df)
+            "row_count": len(df),
+            "cleaning_applied": True,
+            "original_row_count": original_shape[0],
+            "original_column_count": original_shape[1]
         }
         save_data_source(data_source)
 

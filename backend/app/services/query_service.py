@@ -1,8 +1,11 @@
 import time
 from typing import Optional
+import pandas as pd
 
 from app.database import query_data, get_data_sources, get_data_source, save_query_history
 from app.services.claude_service import ClaudeService
+from app.services.marketing_intelligence import MarketingIntelligence
+from app.services.advanced_analytics import AdvancedAnalytics
 
 
 class QueryService:
@@ -10,15 +13,19 @@ class QueryService:
 
     def __init__(self):
         self.claude = ClaudeService()
+        self.marketing_intel = MarketingIntelligence()
+        self.analytics = AdvancedAnalytics()
 
-    def process_query(self, question: str, data_source_ids: Optional[list[str]] = None) -> dict:
+    def process_query(self, question: str, data_source_ids: Optional[list[str]] = None,
+                     deep_analysis: bool = True) -> dict:
         """
         Process a natural language query.
 
         1. Get relevant data sources and their schemas
         2. Generate SQL using Claude
         3. Execute the query
-        4. Generate insights and visualization recommendations
+        4. Run advanced analytics
+        5. Generate deep marketing insights
         """
         start_time = time.time()
 
@@ -69,11 +76,26 @@ class QueryService:
                     except Exception as e2:
                         error = f"Original error: {error}. Retry error: {str(e2)}"
 
-        # Generate insights if we have data
+        # Initialize result containers
         insights_result = {}
+        advanced_analysis = {}
+
+        # Run analysis if we have data
         if data and not error:
             combined_schema = {"columns": [col for s in schema_info for col in s.get("columns", [])]}
-            insights_result = self.claude.generate_insights(question, data, combined_schema)
+            df = pd.DataFrame(data)
+
+            # Run advanced analytics in parallel
+            advanced_analysis = self._run_advanced_analytics(df, question)
+
+            if deep_analysis:
+                # Get deep marketing intelligence
+                insights_result = self.marketing_intel.analyze_performance(
+                    data, combined_schema, question
+                )
+            else:
+                # Fallback to basic insights
+                insights_result = self.claude.generate_insights(question, data, combined_schema)
 
         # Save to history
         result_summary = f"{len(data)} rows returned" if data else error or "No results"
@@ -87,14 +109,143 @@ class QueryService:
             "sql_explanation": sql_result.get("explanation", ""),
             "data": data,
             "error": error,
-            "insights": insights_result.get("insights", ""),
-            "key_findings": insights_result.get("key_findings", []),
-            "recommendations": insights_result.get("recommendations", []),
-            "visualization": insights_result.get("visualization"),
+
+            # Deep marketing intelligence
+            "executive_summary": insights_result.get("executive_summary", ""),
+            "performance_assessment": insights_result.get("performance_assessment", {}),
+            "deep_insights": insights_result.get("deep_insights", []),
+            "funnel_analysis": insights_result.get("funnel_analysis", {}),
+            "channel_analysis": insights_result.get("channel_analysis", []),
+            "budget_recommendations": insights_result.get("budget_recommendations", {}),
+            "anomalies_detected": insights_result.get("anomalies_detected", []),
+            "strategic_recommendations": insights_result.get("strategic_recommendations", []),
+            "testing_suggestions": insights_result.get("testing_suggestions", []),
+
+            # Legacy fields for compatibility
+            "insights": insights_result.get("executive_summary") or insights_result.get("insights", ""),
+            "key_findings": [i.get("insight", i.get("title", "")) for i in insights_result.get("deep_insights", [])][:5],
+            "recommendations": [r.get("recommendation", r) for r in insights_result.get("strategic_recommendations", [])][:5],
+
+            # Advanced analytics
+            "analytics": advanced_analysis,
+
+            # Visualization and follow-up
+            "visualization": insights_result.get("visualization") or self._suggest_visualization(data, question),
             "follow_up_questions": insights_result.get("follow_up_questions", []),
+            "data_quality_notes": insights_result.get("data_quality_notes", []),
+
+            # Metadata
             "execution_time_ms": execution_time_ms,
-            "row_count": len(data)
+            "row_count": len(data),
+            "analysis_depth": "deep" if deep_analysis else "basic"
         }
+
+    def _run_advanced_analytics(self, df: pd.DataFrame, question: str) -> dict:
+        """Run advanced analytics on the data."""
+        analytics_results = {}
+
+        try:
+            # Time series analysis
+            if 'date' in df.columns:
+                metric_cols = [c for c in df.columns if c in ['spend', 'revenue', 'conversions', 'clicks', 'impressions']]
+                if metric_cols:
+                    analytics_results["time_series"] = self.analytics.analyze_time_series(
+                        df, metric_cols[0], 'date'
+                    )
+
+                    # Anomaly detection
+                    analytics_results["anomalies"] = self.analytics.detect_anomalies(
+                        df, metric_cols[0], 'date'
+                    )
+
+            # Attribution analysis
+            if 'channel' in df.columns or 'source' in df.columns:
+                analytics_results["attribution"] = self.analytics.attribution_analysis(df)
+
+            # Correlation analysis
+            analytics_results["correlations"] = self.analytics.correlation_analysis(df)
+
+            # Segmentation
+            for dim in ['channel', 'campaign', 'source']:
+                if dim in df.columns:
+                    analytics_results[f"segmentation_by_{dim}"] = self.analytics.segmentation_analysis(df, dim)
+                    break
+
+        except Exception as e:
+            analytics_results["error"] = str(e)
+
+        return analytics_results
+
+    def _suggest_visualization(self, data: list[dict], question: str) -> dict:
+        """Suggest appropriate visualization based on data and question."""
+        if not data:
+            return {"type": "table", "title": "No Data"}
+
+        df = pd.DataFrame(data)
+        columns = list(df.columns)
+        question_lower = question.lower()
+
+        # Determine visualization type based on question and data
+        if any(word in question_lower for word in ['trend', 'over time', 'daily', 'weekly', 'monthly']):
+            date_col = next((c for c in columns if 'date' in c.lower()), columns[0])
+            metric_col = next((c for c in columns if c not in [date_col] and df[c].dtype in ['int64', 'float64']), None)
+            return {
+                "type": "line",
+                "title": f"{metric_col} Over Time" if metric_col else "Trend",
+                "x_axis": date_col,
+                "y_axis": metric_col
+            }
+
+        elif any(word in question_lower for word in ['breakdown', 'by', 'compare', 'comparison']):
+            # Look for a categorical and numeric column
+            cat_col = next((c for c in columns if df[c].dtype == 'object'), columns[0])
+            num_col = next((c for c in columns if c != cat_col and df[c].dtype in ['int64', 'float64']), None)
+
+            if len(df) <= 6:
+                return {
+                    "type": "pie",
+                    "title": f"{num_col} by {cat_col}" if num_col else "Distribution",
+                    "x_axis": cat_col,
+                    "y_axis": num_col
+                }
+            return {
+                "type": "bar",
+                "title": f"{num_col} by {cat_col}" if num_col else "Comparison",
+                "x_axis": cat_col,
+                "y_axis": num_col
+            }
+
+        elif any(word in question_lower for word in ['total', 'sum', 'overall']):
+            if len(data) == 1:
+                return {
+                    "type": "metric",
+                    "title": "Total",
+                    "x_axis": None,
+                    "y_axis": list(data[0].keys())[0]
+                }
+
+        elif any(word in question_lower for word in ['correlation', 'relationship', 'vs', 'versus']):
+            numeric_cols = [c for c in columns if df[c].dtype in ['int64', 'float64']]
+            if len(numeric_cols) >= 2:
+                return {
+                    "type": "scatter",
+                    "title": f"{numeric_cols[0]} vs {numeric_cols[1]}",
+                    "x_axis": numeric_cols[0],
+                    "y_axis": numeric_cols[1]
+                }
+
+        # Default: bar chart or table
+        if len(df) <= 20:
+            cat_col = next((c for c in columns if df[c].dtype == 'object'), columns[0])
+            num_col = next((c for c in columns if c != cat_col and df[c].dtype in ['int64', 'float64']), None)
+            return {
+                "type": "bar",
+                "title": "Results",
+                "x_axis": cat_col,
+                "y_axis": num_col
+            }
+
+        return {"type": "table", "title": "Query Results"}
 
     def _attempt_sql_fix(
         self,

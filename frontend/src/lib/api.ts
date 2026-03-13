@@ -9,8 +9,10 @@ export interface DataSource {
     columns: Column[];
     row_count: number;
     column_count: number;
+    cleaning_report?: CleaningReport;
   };
   row_count?: number;
+  cleaning_applied?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -24,15 +26,100 @@ export interface Column {
   semantic_type?: string;
 }
 
+export interface CleaningReport {
+  original_shape: [number, number];
+  cleaned_shape: [number, number];
+  actions_taken: string[];
+  outliers_detected: Record<string, any>;
+  columns_mapped: string[];
+}
+
+export interface PerformanceAssessment {
+  overall_health: "healthy" | "warning" | "critical";
+  health_score: number;
+  key_metrics: Array<{
+    metric: string;
+    value: string;
+    benchmark: string;
+    assessment: string;
+    delta_percentage: string;
+  }>;
+}
+
+export interface DeepInsight {
+  category: "trend" | "anomaly" | "opportunity" | "risk" | "correlation";
+  title: string;
+  insight: string;
+  confidence: "high" | "medium" | "low";
+  impact: "high" | "medium" | "low";
+}
+
+export interface ChannelAnalysis {
+  channel: string;
+  role: string;
+  efficiency_score: number;
+  strengths: string[];
+  weaknesses: string[];
+  recommendation: string;
+}
+
+export interface StrategicRecommendation {
+  priority: "high" | "medium" | "low";
+  timeframe: "immediate" | "short_term" | "long_term";
+  recommendation: string;
+  expected_outcome: string;
+  effort: "low" | "medium" | "high";
+  impact: "low" | "medium" | "high";
+}
+
+export interface Anomaly {
+  type: string;
+  metric: string;
+  when: string;
+  magnitude: string;
+  possible_causes: string[];
+  recommended_action: string;
+}
+
 export interface QueryResult {
   question: string;
   sql_query: string;
   sql_explanation?: string;
   data: Record<string, any>[];
   error?: string;
+
+  // Deep marketing intelligence
+  executive_summary?: string;
+  performance_assessment?: PerformanceAssessment;
+  deep_insights?: DeepInsight[];
+  funnel_analysis?: Record<string, any>;
+  channel_analysis?: ChannelAnalysis[];
+  budget_recommendations?: Record<string, any>;
+  anomalies_detected?: Anomaly[];
+  strategic_recommendations?: StrategicRecommendation[];
+  testing_suggestions?: Array<{
+    test_type: string;
+    hypothesis: string;
+    variables: string[];
+    success_metric: string;
+    estimated_duration: string;
+  }>;
+
+  // Legacy fields
   insights: string;
   key_findings?: string[];
   recommendations: string[];
+
+  // Advanced analytics
+  analytics?: {
+    time_series?: Record<string, any>;
+    anomalies?: Array<Record<string, any>>;
+    attribution?: Record<string, any>;
+    correlations?: Record<string, any>;
+    [key: string]: any;
+  };
+
+  // Visualization
   visualization?: {
     type: string;
     title: string;
@@ -40,9 +127,12 @@ export interface QueryResult {
     y_axis?: string;
     config?: Record<string, any>;
   };
+
   follow_up_questions?: string[];
+  data_quality_notes?: string[];
   execution_time_ms: number;
   row_count: number;
+  analysis_depth?: "deep" | "basic";
 }
 
 export async function fetchSources(): Promise<DataSource[]> {

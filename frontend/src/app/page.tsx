@@ -10,9 +10,11 @@ import {
   PieChart,
   TrendingUp,
   DollarSign,
+  Settings,
 } from "lucide-react";
 import ChatMessage from "@/components/ChatMessage";
 import DataSourcePanel from "@/components/DataSourcePanel";
+import ContextPanel from "@/components/ContextPanel";
 import { DataSource, fetchSources, submitQuery, QueryResult } from "@/lib/api";
 import clsx from "clsx";
 
@@ -48,6 +50,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [sources, setSources] = useState<DataSource[]>([]);
   const [showSourcePanel, setShowSourcePanel] = useState(false);
+  const [showContextPanel, setShowContextPanel] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Load data sources on mount
@@ -124,22 +127,32 @@ export default function Home() {
             </div>
           </div>
 
-          <button
-            onClick={() => setShowSourcePanel(true)}
-            className={clsx(
-              "flex items-center gap-2 px-4 py-2 rounded-lg transition-colors",
-              sources.length > 0
-                ? "bg-green-50 text-green-700 hover:bg-green-100"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            )}
-          >
-            <Database className="w-4 h-4" />
-            <span className="text-sm font-medium">
-              {sources.length > 0
-                ? `${sources.length} source${sources.length > 1 ? "s" : ""}`
-                : "Add Data"}
-            </span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowContextPanel(true)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+              title="Advertiser Context"
+            >
+              <Settings className="w-4 h-4" />
+              <span className="text-sm font-medium hidden sm:inline">Context</span>
+            </button>
+            <button
+              onClick={() => setShowSourcePanel(true)}
+              className={clsx(
+                "flex items-center gap-2 px-4 py-2 rounded-lg transition-colors",
+                sources.length > 0
+                  ? "bg-green-50 text-green-700 hover:bg-green-100"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              )}
+            >
+              <Database className="w-4 h-4" />
+              <span className="text-sm font-medium">
+                {sources.length > 0
+                  ? `${sources.length} source${sources.length > 1 ? "s" : ""}`
+                  : "Add Data"}
+              </span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -257,6 +270,15 @@ export default function Home() {
         isOpen={showSourcePanel}
         onClose={() => setShowSourcePanel(false)}
       />
+
+      {/* Context Panel Modal */}
+      {showContextPanel && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <ContextPanel onClose={() => setShowContextPanel(false)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

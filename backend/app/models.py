@@ -80,3 +80,80 @@ class MarketingMetrics(BaseModel):
     cpa: Optional[float] = None  # Cost per acquisition
     roas: Optional[float] = None  # Return on ad spend
     cpm: Optional[float] = None  # Cost per mille
+
+
+class AdvertiserContext(BaseModel):
+    """Advertiser-specific context for AI insights"""
+    id: Optional[str] = None
+    data_source_id: Optional[str] = None  # None = applies to all sources
+    name: str  # e.g., "Acme Corp Context"
+
+    # Business context
+    industry: Optional[str] = None
+    business_model: Optional[str] = None  # B2B, B2C, DTC, etc.
+    sales_cycle_days: Optional[int] = None
+    primary_kpi: Optional[str] = None
+    secondary_kpis: Optional[list[str]] = None
+
+    # Targets and benchmarks
+    target_cpa: Optional[float] = None
+    target_roas: Optional[float] = None
+    target_ctr: Optional[float] = None
+    industry_benchmarks: Optional[dict] = None  # {"cpa": 50, "roas": 3.0}
+
+    # Channel-specific rules
+    channel_rules: Optional[list[dict]] = None  # [{"channel": "Google Brand", "rule": "never pause"}]
+
+    # Custom instructions
+    dos: Optional[list[str]] = None  # Things Claude should do
+    donts: Optional[list[str]] = None  # Things Claude should avoid
+    custom_instructions: Optional[str] = None  # Free-form instructions
+
+    # Attribution preferences
+    attribution_window_days: Optional[int] = None
+    preferred_attribution_model: Optional[str] = None
+
+    # Metadata
+    created_at: datetime = datetime.now()
+    updated_at: datetime = datetime.now()
+
+
+class AdvertiserContextCreate(BaseModel):
+    """Create request for advertiser context"""
+    data_source_id: Optional[str] = None
+    name: str
+    industry: Optional[str] = None
+    business_model: Optional[str] = None
+    sales_cycle_days: Optional[int] = None
+    primary_kpi: Optional[str] = None
+    secondary_kpis: Optional[list[str]] = None
+    target_cpa: Optional[float] = None
+    target_roas: Optional[float] = None
+    target_ctr: Optional[float] = None
+    industry_benchmarks: Optional[dict] = None
+    channel_rules: Optional[list[dict]] = None
+    dos: Optional[list[str]] = None
+    donts: Optional[list[str]] = None
+    custom_instructions: Optional[str] = None
+    attribution_window_days: Optional[int] = None
+    preferred_attribution_model: Optional[str] = None
+
+
+class AdvertiserContextUpdate(BaseModel):
+    """Update request for advertiser context"""
+    name: Optional[str] = None
+    industry: Optional[str] = None
+    business_model: Optional[str] = None
+    sales_cycle_days: Optional[int] = None
+    primary_kpi: Optional[str] = None
+    secondary_kpis: Optional[list[str]] = None
+    target_cpa: Optional[float] = None
+    target_roas: Optional[float] = None
+    target_ctr: Optional[float] = None
+    industry_benchmarks: Optional[dict] = None
+    channel_rules: Optional[list[dict]] = None
+    dos: Optional[list[str]] = None
+    donts: Optional[list[str]] = None
+    custom_instructions: Optional[str] = None
+    attribution_window_days: Optional[int] = None
+    preferred_attribution_model: Optional[str] = None

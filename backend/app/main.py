@@ -4,10 +4,14 @@ from typing import Optional
 import os
 
 from app.config import settings
-from app.database import init_db, get_data_sources, get_data_source, delete_data_source, query_data as db_query
+from app.database import (
+    init_db, get_data_sources, get_data_source, delete_data_source, query_data as db_query,
+    save_advertiser_context, get_advertiser_contexts, get_advertiser_context,
+    delete_advertiser_context, get_context_for_source
+)
 from app.connectors import CSVConnector, GoogleSheetsConnector
 from app.services import QueryService, ConversionAnalytics, IncrementalityAnalyzer, AttributionModels
-from app.models import QueryRequest, DataSourceType
+from app.models import QueryRequest, DataSourceType, AdvertiserContextCreate, AdvertiserContextUpdate
 import pandas as pd
 
 # Initialize app
@@ -486,6 +490,138 @@ async def compare_attribution_models():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Advertiser Context ============
+
+@app.get("/api/context")
+async def list_contexts(data_source_id: Optional[str] = None):
+    """List all advertiser contexts, optionally filtered by data source."""
+    contexts = get_advertiser_contexts(data_source_id)
+    return {"contexts": contexts}
+
+
+@app.get("/api/context/{context_id}")
+async def get_context(context_id: str):
+    """Get a specific advertiser context."""
+    context = get_advertiser_context(context_id)
+    if not context:
+        raise HTTPException(status_code=404, detail="Context not found")
+    return context
+
+
+@app.post("/api/context")
+async def create_context(context: AdvertiserContextCreate):
+    """
+    Create a new advertiser context.
+
+    This context will be used by Claude when generating insights for the
+    associated data source (or all sources if data_source_id is None).
+
+    Example:
+    {
+        "name": "Acme Corp",
+        "data_source_id": "abc123",  // optional, null = applies to all
+        "industry": "B2B SaaS",
+        "business_model": "B2B",
+        "sales_cycle_days": 45,
+        "primary_kpi": "Qualified Leads",
+        "target_cpa": 150,
+        "target_roas": 3.0,
+        "channel_rules": [
+            {"channel": "Google Brand", "rule": "Never pause, always maintain"},
+            {"channel": "LinkedIn", "rule": "Expect high CPA ($200+), focus on quality"}
+        ],
+        "dos": [
+            "Weight MQLs higher than raw form fills",
+            "Consider 30-day attribution window"
+        ],
+        "donts": [
+            "Don't recommend pausing brand campaigns",
+            "Don't compare B2B CPAs to B2C benchmarks"
+        ],
+        "custom_instructions": "This client is very sensitive about brand safety."
+    }
+    """
+    context_dict = context.model_dump()
+    context_id = save_advertiser_context(context_dict)
+    return {"id": context_id, "message": "Context created successfully"}
+
+
+@app.put("/api/context/{context_id}")
+async def update_context(context_id: str, context: AdvertiserContextUpdate):
+    """Update an existing advertiser context."""
+    existing = get_advertiser_context(context_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Context not found")
+
+    # Merge updates with existing
+    update_data = context.model_dump(exclude_unset=True)
+    updated_context = {**existing, **update_data, "id": context_id}
+
+    save_advertiser_context(updated_context)
+    return {"id": context_id, "message": "Context updated successfully"}
+
+
+@app.delete("/api/context/{context_id}")
+async def remove_context(context_id: str):
+    """Delete an advertiser context."""
+    existing = get_advertiser_context(context_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Context not found")
+
+    delete_advertiser_context(context_id)
+    return {"deleted": True, "id": context_id}
+
+
+@app.get("/api/sources/{source_id}/context")
+async def get_source_context(source_id: str):
+    """Get the effective context for a specific data source."""
+    source = get_data_source(source_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Data source not found")
+
+    context = get_context_for_source(source_id)
+    if not context:
+        return {"context": None, "message": "No context configured for this source"}
+
+    return {"context": context}
+
+
+@app.post("/api/context/quick-setup")
+async def quick_context_setup(
+    name: str = Form(...),
+    data_source_id: Optional[str] = Form(None),
+    industry: Optional[str] = Form(None),
+    business_model: Optional[str] = Form(None),
+    primary_kpi: Optional[str] = Form(None),
+    target_cpa: Optional[float] = Form(None),
+    target_roas: Optional[float] = Form(None),
+    dos: Optional[str] = Form(None),  # Comma-separated
+    donts: Optional[str] = Form(None),  # Comma-separated
+    custom_instructions: Optional[str] = Form(None)
+):
+    """
+    Quick setup for advertiser context using form data.
+
+    For dos/donts, provide comma-separated values:
+    dos: "Focus on lead quality, Consider 30-day window"
+    """
+    context = {
+        "name": name,
+        "data_source_id": data_source_id,
+        "industry": industry,
+        "business_model": business_model,
+        "primary_kpi": primary_kpi,
+        "target_cpa": target_cpa,
+        "target_roas": target_roas,
+        "dos": [d.strip() for d in dos.split(",")] if dos else None,
+        "donts": [d.strip() for d in donts.split(",")] if donts else None,
+        "custom_instructions": custom_instructions,
+    }
+
+    context_id = save_advertiser_context(context)
+    return {"id": context_id, "message": "Context created successfully"}
 
 
 if __name__ == "__main__":

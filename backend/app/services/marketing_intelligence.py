@@ -122,7 +122,8 @@ class MarketingIntelligence:
         self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         self.model = settings.claude_model
 
-    def analyze_performance(self, data: list[dict], schema_info: dict, question: str) -> dict:
+    def analyze_performance(self, data: list[dict], schema_info: dict, question: str,
+                            advertiser_context: Optional[dict] = None) -> dict:
         """
         Perform deep marketing analysis on the data.
 
@@ -135,6 +136,9 @@ class MarketingIntelligence:
         """
         # Prepare data summary
         data_summary = self._prepare_data_summary(data, schema_info)
+
+        # Format advertiser context
+        context_section = self._format_advertiser_context(advertiser_context)
 
         prompt = f"""{MARKETING_SYSTEM_PROMPT}
 
@@ -152,6 +156,13 @@ class MarketingIntelligence:
 
 ## ROAS BENCHMARKS BY BUSINESS TYPE
 {json.dumps(ROAS_BENCHMARKS, indent=2)}
+{context_section}
+
+CRITICAL INSTRUCTIONS:
+- If advertiser context is provided above, you MUST follow ALL do's and don'ts exactly
+- Compare metrics against the client's specific targets (not just industry benchmarks)
+- Apply channel-specific rules when making recommendations
+- Consider the client's business model and sales cycle in your analysis
 
 Please provide a comprehensive analysis in the following JSON format:
 {{
@@ -393,3 +404,76 @@ Use clear business language, not technical jargon. Be specific with numbers and 
         )
 
         return response.content[0].text
+
+    def _format_advertiser_context(self, context: Optional[dict]) -> str:
+        """Format advertiser context for inclusion in prompts."""
+        if not context:
+            return ""
+
+        lines = ["\n\n## ADVERTISER CONTEXT (MUST FOLLOW)"]
+
+        if context.get("name"):
+            lines.append(f"**Client:** {context['name']}")
+
+        if context.get("industry"):
+            lines.append(f"**Industry:** {context['industry']}")
+
+        if context.get("business_model"):
+            lines.append(f"**Business Model:** {context['business_model']}")
+
+        if context.get("sales_cycle_days"):
+            lines.append(f"**Sales Cycle:** {context['sales_cycle_days']} days")
+
+        if context.get("primary_kpi"):
+            lines.append(f"**Primary KPI:** {context['primary_kpi']}")
+
+        if context.get("secondary_kpis"):
+            lines.append(f"**Secondary KPIs:** {', '.join(context['secondary_kpis'])}")
+
+        # Client-specific targets (override benchmarks)
+        targets = []
+        if context.get("target_cpa"):
+            targets.append(f"CPA Target: <${context['target_cpa']}")
+        if context.get("target_roas"):
+            targets.append(f"ROAS Target: >{context['target_roas']}x")
+        if context.get("target_ctr"):
+            targets.append(f"CTR Target: >{context['target_ctr']}%")
+        if targets:
+            lines.append(f"**Client Targets:** {', '.join(targets)}")
+            lines.append("(Use these targets instead of generic industry benchmarks)")
+
+        # Client-provided benchmarks
+        if context.get("industry_benchmarks"):
+            benchmarks = context["industry_benchmarks"]
+            bench_str = ", ".join([f"{k}: {v}" for k, v in benchmarks.items()])
+            lines.append(f"**Client Industry Benchmarks:** {bench_str}")
+
+        # Channel-specific rules
+        if context.get("channel_rules"):
+            lines.append("\n**Channel-Specific Rules (MUST FOLLOW):**")
+            for rule in context["channel_rules"]:
+                lines.append(f"  - **{rule.get('channel', 'Unknown')}**: {rule.get('rule', '')}")
+
+        # Attribution preferences
+        if context.get("attribution_window_days"):
+            lines.append(f"\n**Attribution Window:** {context['attribution_window_days']} days")
+        if context.get("preferred_attribution_model"):
+            lines.append(f"**Preferred Attribution:** {context['preferred_attribution_model']}")
+
+        # Do's - CRITICAL
+        if context.get("dos"):
+            lines.append("\n**DO (Required behaviors):**")
+            for do in context["dos"]:
+                lines.append(f"  - {do}")
+
+        # Don'ts - CRITICAL
+        if context.get("donts"):
+            lines.append("\n**DO NOT (Forbidden recommendations):**")
+            for dont in context["donts"]:
+                lines.append(f"  - {dont}")
+
+        # Custom instructions
+        if context.get("custom_instructions"):
+            lines.append(f"\n**Additional Client Instructions:**\n{context['custom_instructions']}")
+
+        return "\n".join(lines)

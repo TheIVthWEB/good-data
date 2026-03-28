@@ -239,3 +239,95 @@ export async function getSchema(): Promise<{
   if (!res.ok) throw new Error("Failed to fetch schema");
   return res.json();
 }
+
+// ============ Advertiser Context ============
+
+export interface ChannelRule {
+  channel: string;
+  rule: string;
+}
+
+export interface AdvertiserContext {
+  id?: string;
+  data_source_id?: string | null;
+  name: string;
+  industry?: string;
+  business_model?: string;
+  sales_cycle_days?: number;
+  primary_kpi?: string;
+  secondary_kpis?: string[];
+  target_cpa?: number;
+  target_roas?: number;
+  target_ctr?: number;
+  industry_benchmarks?: Record<string, number>;
+  channel_rules?: ChannelRule[];
+  dos?: string[];
+  donts?: string[];
+  custom_instructions?: string;
+  attribution_window_days?: number;
+  preferred_attribution_model?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export async function fetchContexts(dataSourceId?: string): Promise<AdvertiserContext[]> {
+  const url = dataSourceId
+    ? `${API_BASE}/context?data_source_id=${dataSourceId}`
+    : `${API_BASE}/context`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Failed to fetch contexts");
+  const data = await res.json();
+  return data.contexts;
+}
+
+export async function fetchContext(contextId: string): Promise<AdvertiserContext> {
+  const res = await fetch(`${API_BASE}/context/${contextId}`);
+  if (!res.ok) throw new Error("Failed to fetch context");
+  return res.json();
+}
+
+export async function createContext(
+  context: Omit<AdvertiserContext, "id" | "created_at" | "updated_at">
+): Promise<{ id: string; message: string }> {
+  const res = await fetch(`${API_BASE}/context`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(context),
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Failed to create context");
+  }
+  return res.json();
+}
+
+export async function updateContext(
+  contextId: string,
+  context: Partial<AdvertiserContext>
+): Promise<{ id: string; message: string }> {
+  const res = await fetch(`${API_BASE}/context/${contextId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(context),
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Failed to update context");
+  }
+  return res.json();
+}
+
+export async function deleteContext(contextId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/context/${contextId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete context");
+}
+
+export async function getSourceContext(
+  sourceId: string
+): Promise<{ context: AdvertiserContext | null; message?: string }> {
+  const res = await fetch(`${API_BASE}/sources/${sourceId}/context`);
+  if (!res.ok) throw new Error("Failed to fetch source context");
+  return res.json();
+}

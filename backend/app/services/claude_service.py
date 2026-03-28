@@ -12,7 +12,79 @@ class ClaudeService:
         self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         self.model = settings.claude_model
 
-    def generate_sql(self, question: str, schema_info: dict, table_names: list[str]) -> dict:
+    def _format_advertiser_context(self, context: Optional[dict]) -> str:
+        """Format advertiser context for inclusion in prompts."""
+        if not context:
+            return ""
+
+        lines = ["\n\nADVERTISER CONTEXT:"]
+
+        if context.get("name"):
+            lines.append(f"Client: {context['name']}")
+
+        if context.get("industry"):
+            lines.append(f"Industry: {context['industry']}")
+
+        if context.get("business_model"):
+            lines.append(f"Business Model: {context['business_model']}")
+
+        if context.get("sales_cycle_days"):
+            lines.append(f"Sales Cycle: {context['sales_cycle_days']} days")
+
+        if context.get("primary_kpi"):
+            lines.append(f"Primary KPI: {context['primary_kpi']}")
+
+        if context.get("secondary_kpis"):
+            lines.append(f"Secondary KPIs: {', '.join(context['secondary_kpis'])}")
+
+        # Targets
+        targets = []
+        if context.get("target_cpa"):
+            targets.append(f"CPA < ${context['target_cpa']}")
+        if context.get("target_roas"):
+            targets.append(f"ROAS > {context['target_roas']}x")
+        if context.get("target_ctr"):
+            targets.append(f"CTR > {context['target_ctr']}%")
+        if targets:
+            lines.append(f"Targets: {', '.join(targets)}")
+
+        # Industry benchmarks
+        if context.get("industry_benchmarks"):
+            benchmarks = context["industry_benchmarks"]
+            bench_str = ", ".join([f"{k}: {v}" for k, v in benchmarks.items()])
+            lines.append(f"Industry Benchmarks: {bench_str}")
+
+        # Channel rules
+        if context.get("channel_rules"):
+            lines.append("\nChannel-Specific Rules:")
+            for rule in context["channel_rules"]:
+                lines.append(f"  - {rule.get('channel', 'Unknown')}: {rule.get('rule', '')}")
+
+        # Attribution preferences
+        if context.get("attribution_window_days"):
+            lines.append(f"\nAttribution Window: {context['attribution_window_days']} days")
+        if context.get("preferred_attribution_model"):
+            lines.append(f"Preferred Attribution Model: {context['preferred_attribution_model']}")
+
+        # Do's and Don'ts
+        if context.get("dos"):
+            lines.append("\nDO:")
+            for do in context["dos"]:
+                lines.append(f"  - {do}")
+
+        if context.get("donts"):
+            lines.append("\nDO NOT:")
+            for dont in context["donts"]:
+                lines.append(f"  - {dont}")
+
+        # Custom instructions
+        if context.get("custom_instructions"):
+            lines.append(f"\nAdditional Instructions:\n{context['custom_instructions']}")
+
+        return "\n".join(lines)
+
+    def generate_sql(self, question: str, schema_info: dict, table_names: list[str],
+                     advertiser_context: Optional[dict] = None) -> dict:
         """
         Convert natural language question to SQL query.
 
@@ -39,6 +111,7 @@ IMPORTANT GUIDELINES:
 - CPA = spend / conversions
 - ROAS = revenue / spend
 - CPM = spend / impressions * 1000
+{self._format_advertiser_context(advertiser_context)}
 
 Respond in JSON format:
 {{
@@ -71,7 +144,8 @@ Respond in JSON format:
             "metrics_calculated": []
         }
 
-    def generate_insights(self, question: str, data: list[dict], schema_info: dict) -> dict:
+    def generate_insights(self, question: str, data: list[dict], schema_info: dict,
+                          advertiser_context: Optional[dict] = None) -> dict:
         """
         Generate insights and recommendations from query results.
 
@@ -106,6 +180,10 @@ Consider these marketing aspects:
 - Audience segment performance
 - Temporal patterns (day of week, time of day, seasonality)
 - Budget allocation optimization
+{self._format_advertiser_context(advertiser_context)}
+
+IMPORTANT: If advertiser context is provided above, you MUST follow the do's and don'ts exactly.
+Compare metrics against the provided targets and benchmarks when making recommendations.
 
 Respond in JSON format:
 {{

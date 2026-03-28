@@ -2,7 +2,7 @@ import time
 from typing import Optional
 import pandas as pd
 
-from app.database import query_data, get_data_sources, get_data_source, save_query_history
+from app.database import query_data, get_data_sources, get_data_source, save_query_history, get_context_for_source
 from app.services.claude_service import ClaudeService
 from app.services.marketing_intelligence import MarketingIntelligence
 from app.services.advanced_analytics import AdvancedAnalytics
@@ -55,8 +55,13 @@ class QueryService:
         schema_info = [s.get("schema_info", {}) for s in sources]
         table_names = [s["config"]["table_name"] for s in sources]
 
+        # Get advertiser context (use first source's context, or global)
+        advertiser_context = None
+        if sources:
+            advertiser_context = get_context_for_source(sources[0]["id"])
+
         # Generate SQL query
-        sql_result = self.claude.generate_sql(question, schema_info, table_names)
+        sql_result = self.claude.generate_sql(question, schema_info, table_names, advertiser_context)
         sql_query = sql_result.get("sql", "")
 
         # Execute the query
@@ -95,11 +100,11 @@ class QueryService:
             if deep_analysis:
                 # Get deep marketing intelligence
                 insights_result = self.marketing_intel.analyze_performance(
-                    data, combined_schema, question
+                    data, combined_schema, question, advertiser_context
                 )
             else:
                 # Fallback to basic insights
-                insights_result = self.claude.generate_insights(question, data, combined_schema)
+                insights_result = self.claude.generate_insights(question, data, combined_schema, advertiser_context)
 
         # Save to history
         result_summary = f"{len(data)} rows returned" if data else error or "No results"

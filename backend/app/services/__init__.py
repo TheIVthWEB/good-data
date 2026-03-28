@@ -5,6 +5,7 @@ from app.services.marketing_intelligence import MarketingIntelligence
 from app.services.advanced_analytics import AdvancedAnalytics
 from app.services.conversion_analytics import ConversionAnalytics
 from app.services.incrementality import IncrementalityAnalyzer
+from app.services.attribution import AttributionModels
 
 __all__ = [
     "ClaudeService",
@@ -14,4 +15,5 @@ __all__ = [
     "AdvancedAnalytics",
     "ConversionAnalytics",
     "IncrementalityAnalyzer",
+    "AttributionModels",
 ]

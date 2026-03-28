@@ -6,7 +6,7 @@ import os
 from app.config import settings
 from app.database import init_db, get_data_sources, get_data_source, delete_data_source, query_data as db_query
 from app.connectors import CSVConnector, GoogleSheetsConnector
-from app.services import QueryService, ConversionAnalytics, IncrementalityAnalyzer
+from app.services import QueryService, ConversionAnalytics, IncrementalityAnalyzer, AttributionModels
 from app.models import QueryRequest, DataSourceType
 import pandas as pd
 
@@ -30,6 +30,7 @@ app.add_middleware(
 query_service = QueryService()
 conversion_analytics = ConversionAnalytics()
 incrementality_analyzer = IncrementalityAnalyzer()
+attribution_models = AttributionModels()
 
 
 @app.on_event("startup")
@@ -367,6 +368,124 @@ async def design_holdout_test(
         daily_conversions, minimum_lift, confidence, power
     )
     return result
+
+
+# ============ Attribution Analytics ============
+
+@app.get("/api/analytics/attribution")
+async def attribution_analysis():
+    """
+    Run attribution analysis on aggregated channel data.
+
+    For multi-touch attribution models, upload user journey data with columns:
+    user_id, timestamp, channel, converted
+    """
+    sources = get_data_sources()
+    if not sources:
+        raise HTTPException(status_code=400, detail="No data sources available")
+
+    try:
+        table_names = [s["config"]["table_name"] for s in sources]
+        dfs = [db_query(f"SELECT * FROM {t}") for t in table_names]
+        df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+        if df.empty:
+            raise HTTPException(status_code=400, detail="No data available")
+
+        # Check if this is journey data or aggregated data
+        journey_cols = ['user_id', 'timestamp', 'channel', 'converted']
+        has_journey_data = all(col in df.columns for col in journey_cols)
+
+        if has_journey_data:
+            result = attribution_models.attribute_journeys(df)
+        else:
+            result = attribution_models.attribute_aggregated_data(df)
+
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/analytics/attribution/journeys")
+async def multi_touch_attribution(
+    user_col: str = Form(default="user_id"),
+    timestamp_col: str = Form(default="timestamp"),
+    channel_col: str = Form(default="channel"),
+    conversion_col: str = Form(default="converted"),
+    revenue_col: Optional[str] = Form(default=None)
+):
+    """
+    Run multi-touch attribution on user journey data.
+
+    Requires data with: user_id, timestamp, channel, converted columns.
+    Runs all attribution models: last-touch, first-touch, linear,
+    position-based, time-decay, and W-shaped.
+    """
+    sources = get_data_sources()
+    if not sources:
+        raise HTTPException(status_code=400, detail="No data sources available")
+
+    try:
+        table_names = [s["config"]["table_name"] for s in sources]
+        dfs = [db_query(f"SELECT * FROM {t}") for t in table_names]
+        df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+        if df.empty:
+            raise HTTPException(status_code=400, detail="No data available")
+
+        result = attribution_models.attribute_journeys(
+            df,
+            user_col=user_col,
+            timestamp_col=timestamp_col,
+            channel_col=channel_col,
+            conversion_col=conversion_col,
+            revenue_col=revenue_col
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analytics/attribution/compare")
+async def compare_attribution_models():
+    """
+    Compare all attribution models side-by-side.
+
+    Shows how credit differs across models and identifies channels
+    with the biggest discrepancies between models.
+    """
+    sources = get_data_sources()
+    if not sources:
+        raise HTTPException(status_code=400, detail="No data sources available")
+
+    try:
+        table_names = [s["config"]["table_name"] for s in sources]
+        dfs = [db_query(f"SELECT * FROM {t}") for t in table_names]
+        df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+        if df.empty:
+            raise HTTPException(status_code=400, detail="No data available")
+
+        # Check for journey data
+        journey_cols = ['user_id', 'timestamp', 'channel', 'converted']
+        if not all(col in df.columns for col in journey_cols):
+            return {
+                "error": "Multi-touch model comparison requires user journey data",
+                "required_columns": journey_cols,
+                "your_columns": list(df.columns),
+                "suggestion": "Upload data with user_id, timestamp, channel, and converted columns"
+            }
+
+        result = attribution_models.attribute_journeys(df)
+
+        # Return just the comparison
+        return {
+            "model_comparison": result.get("model_comparison"),
+            "channel_insights": result.get("channel_insights"),
+            "journey_stats": result.get("journey_stats")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

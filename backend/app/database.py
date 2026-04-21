@@ -3,9 +3,34 @@ import json
 from pathlib import Path
 from typing import Optional
 from contextlib import contextmanager
+from datetime import datetime
 import pandas as pd
+import numpy as np
 
 from app.config import settings
+
+
+class CustomJSONEncoder(json.JSONEncoder):
+    """JSON encoder that handles pandas/numpy types."""
+    def default(self, obj):
+        if isinstance(obj, pd.Timestamp):
+            return obj.isoformat()
+        if isinstance(obj, (np.integer, np.int64)):
+            return int(obj)
+        if isinstance(obj, (np.floating, np.float64)):
+            return float(obj)
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
+
+def json_dumps(obj):
+    """JSON dumps with custom encoder for pandas/numpy types."""
+    return json.dumps(obj, cls=CustomJSONEncoder)
 
 
 DATABASE_PATH = Path(settings.database_url.replace("sqlite:///", ""))
@@ -106,8 +131,8 @@ def save_data_source(data_source: dict):
             data_source["id"],
             data_source["name"],
             data_source["type"],
-            json.dumps(data_source.get("config", {})),
-            json.dumps(data_source.get("schema_info")),
+            json_dumps(data_source.get("config", {})),
+            json_dumps(data_source.get("schema_info")),
             data_source.get("row_count")
         ))
         conn.commit()
@@ -208,14 +233,14 @@ def save_advertiser_context(context: dict) -> str:
             context.get("business_model"),
             context.get("sales_cycle_days"),
             context.get("primary_kpi"),
-            json.dumps(context.get("secondary_kpis")) if context.get("secondary_kpis") else None,
+            json_dumps(context.get("secondary_kpis")) if context.get("secondary_kpis") else None,
             context.get("target_cpa"),
             context.get("target_roas"),
             context.get("target_ctr"),
-            json.dumps(context.get("industry_benchmarks")) if context.get("industry_benchmarks") else None,
-            json.dumps(context.get("channel_rules")) if context.get("channel_rules") else None,
-            json.dumps(context.get("dos")) if context.get("dos") else None,
-            json.dumps(context.get("donts")) if context.get("donts") else None,
+            json_dumps(context.get("industry_benchmarks")) if context.get("industry_benchmarks") else None,
+            json_dumps(context.get("channel_rules")) if context.get("channel_rules") else None,
+            json_dumps(context.get("dos")) if context.get("dos") else None,
+            json_dumps(context.get("donts")) if context.get("donts") else None,
             context.get("custom_instructions"),
             context.get("attribution_window_days"),
             context.get("preferred_attribution_model"),

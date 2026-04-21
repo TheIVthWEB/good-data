@@ -71,9 +71,9 @@ class CSVConnector:
             col_info = {
                 "name": col,
                 "dtype": str(df[col].dtype),
-                "nullable": df[col].isnull().any(),
-                "unique_count": df[col].nunique(),
-                "sample_values": df[col].dropna().head(3).tolist()
+                "nullable": bool(df[col].isnull().any()),
+                "unique_count": int(df[col].nunique()),
+                "sample_values": [v.item() if hasattr(v, 'item') else v for v in df[col].dropna().head(3).tolist()]
             }
 
             # Detect marketing-specific column types

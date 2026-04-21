@@ -117,8 +117,8 @@ class DataCleaner:
         outlier_info = self._detect_outliers(df)
 
         report = {
-            "original_shape": original_shape,
-            "cleaned_shape": df.shape,
+            "original_shape": (int(original_shape[0]), int(original_shape[1])),
+            "cleaned_shape": (int(df.shape[0]), int(df.shape[1])),
             "actions_taken": self.cleaning_report,
             "outliers_detected": outlier_info,
             "columns_mapped": list(df.columns),
@@ -170,7 +170,7 @@ class DataCleaner:
             if col in df.columns:
                 try:
                     # Try multiple date formats
-                    df[col] = pd.to_datetime(df[col], infer_datetime_format=True, errors='coerce')
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
                     valid_dates = df[col].notna().sum()
                     self.cleaning_report.append(f"Parsed {valid_dates} dates in '{col}'")
                 except Exception as e:

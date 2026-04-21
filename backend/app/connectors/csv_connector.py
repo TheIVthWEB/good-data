@@ -8,6 +8,17 @@ from app.database import create_data_table, save_data_source
 from app.services.data_cleaner import DataCleaner
 
 
+def _serialize_value(v):
+    """Convert pandas/numpy types to JSON-serializable Python types."""
+    if pd.isna(v):
+        return None
+    if isinstance(v, pd.Timestamp):
+        return v.isoformat()
+    if hasattr(v, 'item'):
+        return v.item()
+    return v
+
+
 class CSVConnector:
     """Handle CSV file uploads and data loading."""
 
@@ -73,7 +84,7 @@ class CSVConnector:
                 "dtype": str(df[col].dtype),
                 "nullable": bool(df[col].isnull().any()),
                 "unique_count": int(df[col].nunique()),
-                "sample_values": [v.item() if hasattr(v, 'item') else v for v in df[col].dropna().head(3).tolist()]
+                "sample_values": [_serialize_value(v) for v in df[col].dropna().head(3).tolist()]
             }
 
             # Detect marketing-specific column types
